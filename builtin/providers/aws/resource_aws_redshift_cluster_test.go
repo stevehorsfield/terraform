@@ -38,6 +38,39 @@ func TestAccAWSRedshiftCluster_basic(t *testing.T) {
 	})
 }
 
+func TestAccAWSRedshiftCluster_iamRoles(t *testing.T) {
+	var v redshift.Cluster
+
+	ri := rand.New(rand.NewSource(time.Now().UnixNano())).Int()
+	preConfig := fmt.Sprintf(testAccAWSRedshiftClusterConfig_iamRoles, ri, ri, ri)
+	postConfig := fmt.Sprintf(testAccAWSRedshiftClusterConfig_updateIamRoles, ri, ri, ri)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAWSRedshiftClusterDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: preConfig,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSRedshiftClusterExists("aws_redshift_cluster.default", &v),
+					resource.TestCheckResourceAttr(
+						"aws_redshift_cluster.default", "iam_roles.#", "2"),
+				),
+			},
+
+			resource.TestStep{
+				Config: postConfig,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSRedshiftClusterExists("aws_redshift_cluster.default", &v),
+					resource.TestCheckResourceAttr(
+						"aws_redshift_cluster.default", "iam_roles.#", "1"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccAWSRedshiftCluster_publiclyAccessible(t *testing.T) {
 	var v redshift.Cluster
 
@@ -337,6 +370,64 @@ resource "aws_redshift_cluster" "default" {
   node_type = "dc1.large"
   automated_snapshot_retention_period = 0
   allow_version_upgrade = false
+}`
+
+var testAccAWSRedshiftClusterConfig_iamRoles = `
+provider "aws" {
+	region = "us-west-2"
+}
+
+resource "aws_iam_role" "ec2-role" {
+	name   = "test-role-ec2-%d"
+	path = "/"
+	assume_role_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"
+}
+
+resource "aws_iam_role" "lambda-role" {
+	name   = "test-role-lambda-%d"
+	path = "/"
+	assume_role_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"lambda.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"
+}
+
+resource "aws_redshift_cluster" "default" {
+  cluster_identifier = "tf-redshift-cluster-%d"
+  availability_zone = "us-west-2a"
+  database_name = "mydb"
+  master_username = "foo_test"
+  master_password = "Mustbe8characters"
+  node_type = "dc1.large"
+  automated_snapshot_retention_period = 0
+  allow_version_upgrade = false
+  iam_roles = ["${aws_iam_role.ec2-role.arn}", "${aws_iam_role.lambda-role.arn}"]
+}`
+
+var testAccAWSRedshiftClusterConfig_updateIamRoles = `
+provider "aws" {
+	region = "us-west-2"
+}
+
+resource "aws_iam_role" "ec2-role" {
+	name   = "test-role-ec2-%d"
+	path = "/"
+	assume_role_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"
+}
+
+resource "aws_iam_role" "lambda-role" {
+	name   = "test-role-lambda-%d"
+	path = "/"
+	assume_role_policy = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"lambda.amazonaws.com\"]},\"Action\":[\"sts:AssumeRole\"]}]}"
+}
+
+resource "aws_redshift_cluster" "default" {
+  cluster_identifier = "tf-redshift-cluster-%d"
+  availability_zone = "us-west-2a"
+  database_name = "mydb"
+  master_username = "foo_test"
+  master_password = "Mustbe8characters"
+  node_type = "dc1.large"
+  automated_snapshot_retention_period = 0
+  allow_version_upgrade = false
+  iam_roles = ["${aws_iam_role.ec2-role.arn}"]
 }`
 
 var testAccAWSRedshiftClusterConfig_notPubliclyAccessible = `
