@@ -49,11 +49,13 @@ func (n *EvalReadDataDiff) Eval(ctx EvalContext) (interface{}, error) {
 
 		// id is always computed, because we're always "creating a new resource"
 		diff.init()
-		diff.Attributes["id"] = &ResourceAttrDiff{
-			Old:         "",
-			NewComputed: true,
-			RequiresNew: true,
-			Type:        DiffAttrOutput,
+		if _, ok := diff.Attributes["id"]; !ok {
+			diff.Attributes["id"] = &ResourceAttrDiff{
+				Old:         "",
+				NewComputed: true,
+				RequiresNew: true,
+				Type:        DiffAttrOutput,
+			}
 		}
 	}
 
