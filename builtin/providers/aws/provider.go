@@ -112,6 +112,7 @@ func Provider() terraform.ResourceProvider {
 
 		DataSourcesMap: map[string]*schema.Resource{
 			"aws_subnet": dataSourceAwsSubnet(),
+			"aws_vpc":    dataSourceAwsVpc(),
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
