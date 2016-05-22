@@ -111,8 +111,10 @@ func Provider() terraform.ResourceProvider {
 		},
 
 		DataSourcesMap: map[string]*schema.Resource{
-			"aws_subnet": dataSourceAwsSubnet(),
-			"aws_vpc":    dataSourceAwsVpc(),
+			"aws_availability_zone":  dataSourceAwsAvailabilityZone(),
+			"aws_availability_zones": dataSourceAwsAvailabilityZones(),
+			"aws_subnet":             dataSourceAwsSubnet(),
+			"aws_vpc":                dataSourceAwsVpc(),
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
