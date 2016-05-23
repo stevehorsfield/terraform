@@ -54,7 +54,7 @@ The following arguments are supported:
   within a region.
 * `read_capacity` - (Required) The number of read units for this table
 * `write_capacity` - (Required) The number of write units for this table
-* `hash_key` - (Required) The attribute to use as the hash key (the
+* `hash_key` - (Required, Forces new resource) The attribute to use as the hash key (the
   attribute must also be defined as an attribute record
 * `range_key` - (Optional) The attribute to use as the range key (must
   also be defined)

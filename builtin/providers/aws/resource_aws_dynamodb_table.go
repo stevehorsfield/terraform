@@ -48,6 +48,7 @@ func resourceAwsDynamoDbTable() *schema.Resource {
 			"hash_key": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"range_key": &schema.Schema{
 				Type:     schema.TypeString,
@@ -341,10 +342,6 @@ func resourceAwsDynamoDbTableUpdate(d *schema.ResourceData, meta interface{}) er
 	// LSI can only be done at create-time, abort if it's been changed
 	if d.HasChange("local_secondary_index") {
 		return fmt.Errorf("Local secondary indexes can only be built at creation, you cannot update them!")
-	}
-
-	if d.HasChange("hash_key") {
-		return fmt.Errorf("Hash key can only be specified at creation, you cannot modify it.")
 	}
 
 	if d.HasChange("range_key") {
