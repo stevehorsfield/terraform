@@ -174,6 +174,18 @@ func TestResourceAwsSecurityGroupIPPermGather(t *testing.T) {
 				},
 			},
 		},
+		&ec2.IpPermission{
+			IpProtocol:    aws.String("-1"),
+			FromPort:      aws.Int64(int64(0)),
+			ToPort:        aws.Int64(int64(0)),
+			PrefixListIds: []*ec2.PrefixListId{&ec2.PrefixListId{PrefixListId: aws.String("pl-12345678")}},
+			UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				// VPC
+				&ec2.UserIdGroupPair{
+					GroupId: aws.String("sg-22222"),
+				},
+			},
+		},
 	}
 
 	local := []map[string]interface{}{
@@ -199,6 +211,15 @@ func TestResourceAwsSecurityGroupIPPermGather(t *testing.T) {
 			"security_groups": schema.NewSet(schema.HashString, []interface{}{
 				"ec2_classic",
 				"amazon-elb/amazon-elb-sg",
+			}),
+		},
+		map[string]interface{}{
+			"protocol":        "-1",
+			"from_port":       int64(0),
+			"to_port":         int64(0),
+			"prefix_list_ids": []string{"pl-12345678"},
+			"security_groups": schema.NewSet(schema.HashString, []interface{}{
+				"sg-22222",
 			}),
 		},
 	}
@@ -843,6 +864,27 @@ func TestAccAWSSecurityGroup_ingressWithCidrAndSGs_classic(t *testing.T) {
 	})
 }
 
+func TestAccAWSSecurityGroup_egressWithPrefixList(t *testing.T) {
+	var group ec2.SecurityGroup
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAWSSecurityGroupDestroy,
+		Steps: []resource.TestStep{
+			resource.TestStep{
+				Config: testAccAWSSecurityGroupConfigPrefixListEgress,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAWSSecurityGroupExists("aws_security_group.worker", &group),
+					testAccCheckAWSSecurityGroupPrefixListAttributes(&group),
+					resource.TestCheckResourceAttr(
+						"aws_security_group.worker", "egress.#", "1"),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckAWSSecurityGroupSGandCidrAttributes(group *ec2.SecurityGroup) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		if *group.GroupName != "terraform_acceptance_test_example" {
@@ -874,6 +916,31 @@ func testAccCheckAWSSecurityGroupSGandCidrAttributes(group *ec2.SecurityGroup) r
 				continue
 			}
 			return fmt.Errorf("Found a rouge rule")
+		}
+
+		return nil
+	}
+}
+
+func testAccCheckAWSSecurityGroupPrefixListAttributes(group *ec2.SecurityGroup) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		if *group.GroupName != "worker" {
+			return fmt.Errorf("Bad name: %s", *group.GroupName)
+		}
+		if *group.Description != "Used in the terraform acceptance tests" {
+			return fmt.Errorf("Bad description: %s", *group.Description)
+		}
+		if len(group.IpPermissionsEgress) == 0 {
+			return fmt.Errorf("No egress IPPerms")
+		}
+		if len(group.IpPermissionsEgress) != 1 {
+			return fmt.Errorf("Expected 1 egress rule, got %d", len(group.IpPermissions))
+		}
+
+		p := group.IpPermissionsEgress[0]
+
+		if len(p.PrefixListIds) != 1 {
+			return fmt.Errorf("Expected 1 prefix list, got %d", len(p.PrefixListIds))
 		}
 
 		return nil
@@ -1526,6 +1593,48 @@ resource "aws_security_group" "web" {
 
   tags {
     Name = "tf-acc-test"
+  }
+}
+`
+
+const testAccAWSSecurityGroupConfigPrefixListEgress = `
+resource "aws_vpc" "tf_sg_prefix_list_egress_test" {
+        cidr_block = "10.0.0.0/16"
+        tags {
+                Name = "tf_sg_prefix_list_egress_test"
+        }
+}
+
+resource "aws_vpc_endpoint" "second-private-s3" {
+	vpc_id = "${aws_vpc.tf_sg_prefix_list_egress_test.id}"
+	service_name = "com.amazonaws.us-west-2.s3"
+	route_table_ids = ["${aws_route_table.default.id}"]
+	policy = <<POLICY
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid":"AllowAll",
+			"Effect":"Allow",
+			"Principal":"*",
+			"Action":"*",
+			"Resource":"*"
+		}
+	]
+}	
+POLICY
+}
+
+resource "aws_security_group" "worker" {
+  name = "terraform_acceptance_test_example_1"
+  description = "Used in the terraform acceptance tests"
+        vpc_id = "${aws_vpc.tf_sg_prefix_list_egress_test.id}"
+
+  egress {
+    protocol = "-1"
+    from_port = 0
+    to_port = 0
+    prefix_list_ids = [${aws_vpc_endpoint.second-private-s3.prefix_list_id}]
   }
 }
 `
